@@ -1,4 +1,4 @@
-# 📈 Trading Dashboard with VIX Fix Strategy
+# 📈 SmartVIX Strategy
 
 Un sistema completo de trading con análisis VIX Fix optimizado, datos históricos masivos y API RESTful.
 
@@ -21,8 +21,8 @@ Un sistema completo de trading con análisis VIX Fix optimizado, datos históric
 
 ### 1. Clonar Repositorio
 ```bash
-git clone https://github.com/tu-usuario/trading-dashboard.git
-cd trading-dashboard
+git clone https://github.com/tu-usuario/SmartVIX-Strategy.git
+cd SmartVIX-Strategy
 ```
 
 ### 2. Configurar Backend
@@ -94,7 +94,7 @@ POST /price-updates/configure?interval_minutes=5
 ## 📁 Estructura del Proyecto
 
 ```
-trading-dashboard/
+SmartVIX-Strategy/
 ├── backend/                 # API FastAPI
 │   ├── main.py             # Aplicación principal
 │   ├── requirements.txt    # Dependencias Python

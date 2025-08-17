@@ -73,6 +73,60 @@ export const tradingAPI = {
     );
     return response.data;
   },
+
+  // Análisis histórico completo
+  getHistoricalAnalysis: async (
+    fecha_inicio: string,
+    fecha_fin: string,
+    profit_target?: number,
+    max_days?: number
+  ): Promise<{
+    resumen: {
+      periodo: { inicio: string; fin: string };
+      total_trades: number;
+      trades_exitosos: number;
+      trades_perdida: number;
+      trades_timeout: number;
+      profit_total: number;
+      win_rate: number;
+      avg_profit_ganadores: number;
+      avg_perdida_perdedores: number;
+      avg_dias_duracion: number;
+      mejores_tickers: Array<{ ticker: string; profit: number; win_rate: number }>;
+      peores_tickers: Array<{ ticker: string; profit: number; win_rate: number }>;
+    };
+    trades_historicos: Array<{
+      trade_num: number;
+      ticker: string;
+      fecha_compra: string;
+      precio_compra: number;
+      precio_target: number;
+      fecha_venta?: string;
+      precio_venta?: number;
+      dias_duracion: number;
+      profit_pct: number;
+      profit_absoluto: number;
+      estado_final: 'EXITOSO' | 'PERDIDA' | 'TIMEOUT';
+      resultado_detalle: string;
+    }>;
+    performance_por_ticker: Record<string, any>;
+  }> => {
+    const params = new URLSearchParams({
+      fecha_inicio,
+      fecha_fin,
+    });
+    
+    if (profit_target !== undefined) {
+      params.append('profit_target', profit_target.toString());
+    }
+    
+    if (max_days !== undefined) {
+      params.append('max_days', max_days.toString());
+    }
+    
+    const response = await api.get(`/historical-analysis?${params.toString()}`);
+    return response.data;
+  },
 };
 
 export default api;

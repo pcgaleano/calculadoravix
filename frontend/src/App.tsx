@@ -43,8 +43,46 @@ function App() {
     setError(null);
     
     try {
-      const data = await tradingAPI.getDashboardData(selectedDate);
-      setDashboardData(data);
+      // Calcular diferencia en días
+      const fechaSeleccionada = new Date(selectedDate);
+      const fechaActual = new Date();
+      const diffInDays = Math.floor((fechaActual.getTime() - fechaSeleccionada.getTime()) / (1000 * 60 * 60 * 24));
+      
+      // Si es más de 45 días, usar análisis histórico
+      if (diffInDays > 45) {
+        const fechaFin = fechaActual.toISOString().split('T')[0];
+        const historicalData = await tradingAPI.getHistoricalAnalysis(selectedDate, fechaFin);
+        
+        // Convertir datos históricos al formato del dashboard
+        const dashboardConverted = {
+          fecha_analisis: selectedDate,
+          trades_abiertos: historicalData.trades_historicos.map(trade => ({
+            trade_num: trade.trade_num,
+            ticker: trade.ticker,
+            fecha_compra: trade.fecha_compra,
+            precio_compra: trade.precio_compra,
+            precio_target: trade.precio_target,
+            fecha_venta: trade.fecha_venta || null,
+            precio_venta: trade.precio_venta || null,
+            dias_trade: trade.dias_duracion,
+            profit_pct: trade.profit_pct,
+            profit_absoluto: trade.profit_absoluto,
+            estado: trade.estado_final,
+            precio_actual: trade.precio_venta || trade.precio_compra
+          })),
+          total_trades: historicalData.resumen.total_trades,
+          trades_exitosos: historicalData.resumen.trades_exitosos,
+          profit_total: historicalData.resumen.profit_total,
+          dias_promedio: historicalData.resumen.avg_dias_duracion
+        };
+        
+        setDashboardData(dashboardConverted);
+      } else {
+        // Para períodos cortos, usar dashboard normal
+        const data = await tradingAPI.getDashboardData(selectedDate);
+        setDashboardData(data);
+      }
+      
       setLastUpdated(new Date());
     } catch (err: any) {
       console.error('Error loading dashboard data:', err);

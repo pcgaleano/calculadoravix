@@ -676,6 +676,145 @@ async def get_dashboard_data(fecha: str = Query(..., description="Fecha para an�
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generando dashboard: {str(e)}")
 
+@app.get("/historical-analysis")
+async def get_historical_analysis(
+    fecha_inicio: str = Query(..., description="Fecha inicio del análisis (YYYY-MM-DD)"),
+    fecha_fin: str = Query(..., description="Fecha fin del análisis (YYYY-MM-DD)"),
+    profit_target: float = Query(DEFAULT_PROFIT_TARGET, description="Target de ganancia (ej: 0.04 = 4%)"),
+    max_days: int = Query(None, description="Días máximos de retención (None = sin límite)")
+):
+    """
+    Análisis histórico completo de VIX Fix para un período específico.
+    Muestra todos los trades del período con sus resultados finales.
+    """
+    try:
+        resultados_historicos = []
+        resumen_estadisticas = {
+            "periodo": {"inicio": fecha_inicio, "fin": fecha_fin},
+            "total_trades": 0,
+            "trades_exitosos": 0,
+            "trades_perdida": 0,
+            "trades_timeout": 0,
+            "profit_total": 0.0,
+            "win_rate": 0.0,
+            "avg_profit_ganadores": 0.0,
+            "avg_perdida_perdedores": 0.0,
+            "avg_dias_duracion": 0.0,
+            "mejores_tickers": [],
+            "peores_tickers": []
+        }
+        
+        tickers_performance = {}
+        
+        # Analizar cada ticker
+        for ticker in MAIN_TICKERS:
+            try:
+                analyzer = TradeAnalyzer(
+                    profit_target=profit_target,
+                    max_hold_days=max_days if max_days else 365  # Si no hay límite, usar 1 año
+                )
+                
+                resultados = analyzer.analizar_trades(ticker, fecha_inicio, fecha_fin)
+                
+                if resultados is not None and not resultados.empty:
+                    ticker_stats = {
+                        "ticker": ticker,
+                        "total_trades": len(resultados),
+                        "trades_exitosos": 0,
+                        "trades_perdida": 0,
+                        "trades_timeout": 0,
+                        "profit_total": 0.0,
+                        "win_rate": 0.0,
+                        "trades": []
+                    }
+                    
+                    for _, trade in resultados.iterrows():
+                        # Clasificar resultado del trade
+                        if trade['resultado'] == 'TARGET_ALCANZADO':
+                            estado_final = 'EXITOSO'
+                            ticker_stats["trades_exitosos"] += 1
+                        elif trade['resultado'] == 'TIMEOUT':
+                            estado_final = 'TIMEOUT'
+                            ticker_stats["trades_timeout"] += 1
+                        else:
+                            estado_final = 'PERDIDA'
+                            ticker_stats["trades_perdida"] += 1
+                        
+                        # Calcular profit real del trade
+                        if trade['precio_venta'] and trade['precio_venta'] > 0:
+                            profit_pct = ((trade['precio_venta'] - trade['precio_compra']) / trade['precio_compra']) * 100
+                            profit_absoluto = trade['precio_venta'] - trade['precio_compra']
+                        else:
+                            profit_pct = 0.0
+                            profit_absoluto = 0.0
+                        
+                        ticker_stats["profit_total"] += profit_absoluto
+                        
+                        trade_historico = {
+                            "trade_num": int(trade['trade_num']),
+                            "ticker": ticker,
+                            "fecha_compra": trade['fecha_compra'].strftime('%Y-%m-%d'),
+                            "precio_compra": round(float(trade['precio_compra']), 2),
+                            "precio_target": round(float(trade['precio_target']), 2),
+                            "fecha_venta": trade['fecha_venta'].strftime('%Y-%m-%d') if pd.notna(trade['fecha_venta']) else None,
+                            "precio_venta": round(float(trade['precio_venta']), 2) if pd.notna(trade['precio_venta']) else None,
+                            "dias_duracion": int(trade['dias_trade']),
+                            "profit_pct": round(profit_pct, 2),
+                            "profit_absoluto": round(profit_absoluto, 2),
+                            "estado_final": estado_final,
+                            "resultado_detalle": trade['resultado']
+                        }
+                        
+                        resultados_historicos.append(trade_historico)
+                        ticker_stats["trades"].append(trade_historico)
+                    
+                    # Calcular win rate del ticker
+                    if ticker_stats["total_trades"] > 0:
+                        ticker_stats["win_rate"] = (ticker_stats["trades_exitosos"] / ticker_stats["total_trades"]) * 100
+                    
+                    tickers_performance[ticker] = ticker_stats
+                    
+            except Exception as e:
+                print(f"Error analizando {ticker}: {e}")
+                continue
+        
+        # Calcular estadísticas generales
+        if resultados_historicos:
+            resumen_estadisticas["total_trades"] = len(resultados_historicos)
+            resumen_estadisticas["trades_exitosos"] = len([t for t in resultados_historicos if t["estado_final"] == "EXITOSO"])
+            resumen_estadisticas["trades_perdida"] = len([t for t in resultados_historicos if t["estado_final"] == "PERDIDA"])
+            resumen_estadisticas["trades_timeout"] = len([t for t in resultados_historicos if t["estado_final"] == "TIMEOUT"])
+            resumen_estadisticas["profit_total"] = round(sum(t["profit_absoluto"] for t in resultados_historicos), 2)
+            
+            if resumen_estadisticas["total_trades"] > 0:
+                resumen_estadisticas["win_rate"] = round((resumen_estadisticas["trades_exitosos"] / resumen_estadisticas["total_trades"]) * 100, 2)
+            
+            # Promedios
+            trades_ganadores = [t for t in resultados_historicos if t["estado_final"] == "EXITOSO"]
+            trades_perdedores = [t for t in resultados_historicos if t["estado_final"] in ["PERDIDA", "TIMEOUT"]]
+            
+            if trades_ganadores:
+                resumen_estadisticas["avg_profit_ganadores"] = round(sum(t["profit_pct"] for t in trades_ganadores) / len(trades_ganadores), 2)
+            
+            if trades_perdedores:
+                resumen_estadisticas["avg_perdida_perdedores"] = round(sum(t["profit_pct"] for t in trades_perdedores) / len(trades_perdedores), 2)
+            
+            resumen_estadisticas["avg_dias_duracion"] = round(sum(t["dias_duracion"] for t in resultados_historicos) / len(resultados_historicos), 1)
+            
+            # Mejores y peores tickers
+            tickers_sorted = sorted(tickers_performance.items(), key=lambda x: x[1]["profit_total"], reverse=True)
+            resumen_estadisticas["mejores_tickers"] = [{"ticker": k, "profit": v["profit_total"], "win_rate": v["win_rate"]} for k, v in tickers_sorted[:5]]
+            resumen_estadisticas["peores_tickers"] = [{"ticker": k, "profit": v["profit_total"], "win_rate": v["win_rate"]} for k, v in tickers_sorted[-5:]]
+        
+        return {
+            "resumen": resumen_estadisticas,
+            "trades_historicos": resultados_historicos,
+            "performance_por_ticker": tickers_performance
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error en análisis histórico: {str(e)}")
+
 @app.get("/analyze-all")
 async def analyze_all_tickers(
     fecha_inicio: str = Query(..., description="Fecha inicio (YYYY-MM-DD)"),

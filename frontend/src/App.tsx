@@ -54,7 +54,7 @@ function App() {
         const historicalData = await tradingAPI.getHistoricalAnalysis(selectedDate, fechaFin);
         
         // Convertir datos históricos al formato del dashboard
-        const dashboardConverted = {
+        const dashboardConverted: DashboardData = {
           fecha_analisis: selectedDate,
           trades_abiertos: historicalData.trades_historicos.map(trade => ({
             trade_num: trade.trade_num,
@@ -62,8 +62,8 @@ function App() {
             fecha_compra: trade.fecha_compra,
             precio_compra: trade.precio_compra,
             precio_target: trade.precio_target,
-            fecha_venta: trade.fecha_venta || null,
-            precio_venta: trade.precio_venta || null,
+            fecha_venta: trade.fecha_venta || undefined,
+            precio_venta: trade.precio_venta || undefined,
             dias_trade: trade.dias_duracion,
             profit_pct: trade.profit_pct,
             profit_absoluto: trade.profit_absoluto,

@@ -99,8 +99,8 @@ tmp/
 *.zip
 *.rar
 
-# Excluir frontend temporalmente (submodulo separado)
-frontend/
+# Frontend incluido en el proyecto
+# frontend/
 
 # Coverage reports
 coverage/

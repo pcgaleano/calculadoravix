@@ -9,13 +9,17 @@ interface StatsCardsProps {
 }
 
 const StatsCards: React.FC<StatsCardsProps> = ({
-  totalTrades,
-  tradesExitosos,
-  profitTotal,
-  diasPromedio,
+  totalTrades = 0,
+  tradesExitosos = 0,
+  profitTotal = 0,
+  diasPromedio = 0,
 }) => {
   const tasaExito = totalTrades > 0 ? (tradesExitosos / totalTrades) * 100 : 0;
   const tradesAbiertos = totalTrades - tradesExitosos;
+  
+  // Validar valores numéricos
+  const safeProfitTotal = typeof profitTotal === 'number' ? profitTotal : 0;
+  const safeDiasPromedio = typeof diasPromedio === 'number' ? diasPromedio : 0;
 
   const stats = [
     {
@@ -36,15 +40,15 @@ const StatsCards: React.FC<StatsCardsProps> = ({
     },
     {
       title: 'P&L Total',
-      value: `$${profitTotal.toFixed(2)}`,
-      icon: profitTotal >= 0 ? TrendingUp : TrendingDown,
-      color: profitTotal >= 0 ? 'text-success-400' : 'text-danger-400',
-      bgColor: profitTotal >= 0 ? 'bg-success-900/20' : 'bg-danger-900/20',
-      borderColor: profitTotal >= 0 ? 'border-success-700/50' : 'border-danger-700/50',
+      value: `$${safeProfitTotal.toFixed(2)}`,
+      icon: safeProfitTotal >= 0 ? TrendingUp : TrendingDown,
+      color: safeProfitTotal >= 0 ? 'text-success-400' : 'text-danger-400',
+      bgColor: safeProfitTotal >= 0 ? 'bg-success-900/20' : 'bg-danger-900/20',
+      borderColor: safeProfitTotal >= 0 ? 'border-success-700/50' : 'border-danger-700/50',
     },
     {
       title: 'Días Promedio',
-      value: `${diasPromedio.toFixed(1)}d`,
+      value: `${safeDiasPromedio.toFixed(1)}d`,
       icon: Clock,
       color: 'text-gray-400',
       bgColor: 'bg-gray-900/20',

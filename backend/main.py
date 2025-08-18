@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 from datetime import datetime, date
+from contextlib import asynccontextmanager
 import yfinance as yf
 import pandas as pd
 import sqlite3
@@ -28,10 +29,37 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from trade_analyzer import TradeAnalyzer
 from vix_fix_strategy import VixFixStrategy
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Eventos de inicio y cierre de la aplicación"""
+    # Startup
+    init_db()
+    print("Trading Dashboard API iniciada")
+    print(f"Tickers principales: {len(MAIN_TICKERS)} configurados")
+    
+    # Iniciar job de actualización de precios en background
+    price_thread = threading.Thread(target=actualizar_precios_background, daemon=True)
+    price_thread.start()
+    print("Job de actualización de precios iniciado (cada 5 minutos)")
+    
+    # Iniciar scheduler automático de EOD
+    start_scheduler()
+    if scheduler_running:
+        scheduler_thread = threading.Thread(target=run_pending_jobs, daemon=True)
+        scheduler_thread.start()
+        print(f"📅 Scheduler EOD iniciado automáticamente - Próxima ejecución: {eod_schedule_config['time']} {eod_schedule_config['timezone']}")
+    else:
+        print("⚠️  Scheduler EOD no se pudo iniciar")
+    
+    yield
+    # Shutdown
+    print("Trading Dashboard API cerrándose...")
+
 app = FastAPI(
     title="Trading Dashboard API",
     description="API profesional para análisis de trading con estrategia VIX_Fix",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # Configurar CORS para permitir requests desde el frontend
@@ -289,26 +317,6 @@ def actualizar_precios_background():
     price_update_config['running'] = False
     print("Job de actualización de precios detenido")
 
-@app.on_event("startup")
-async def startup_event():
-    """Eventos de inicio de la aplicación"""
-    init_db()
-    print("Trading Dashboard API iniciada")
-    print(f"Tickers principales: {len(MAIN_TICKERS)} configurados")
-    
-    # Iniciar job de actualización de precios en background
-    price_thread = threading.Thread(target=actualizar_precios_background, daemon=True)
-    price_thread.start()
-    print("Job de actualización de precios iniciado (cada 5 minutos)")
-    
-    # Iniciar scheduler automático de EOD
-    start_scheduler()
-    if scheduler_running:
-        scheduler_thread = threading.Thread(target=run_pending_jobs, daemon=True)
-        scheduler_thread.start()
-        print(f"📅 Scheduler EOD iniciado automáticamente - Próxima ejecución: {eod_schedule_config['time']} {eod_schedule_config['timezone']}")
-    else:
-        print("⚠️  Scheduler EOD no se pudo iniciar")
 
 @app.get("/")
 async def root():

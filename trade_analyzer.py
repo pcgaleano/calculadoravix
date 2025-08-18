@@ -103,7 +103,9 @@ class TradeAnalyzer:
         """
         try:
             stock = yf.Ticker(ticker)
-            data = stock.history(start=fecha_inicio, end=fecha_fin)
+            # IMPORTANTE: yfinance end es exclusivo, necesitamos agregar 1 día para incluir fecha_fin
+            fecha_fin_inclusiva = (pd.to_datetime(fecha_fin) + pd.Timedelta(days=1)).strftime('%Y-%m-%d')
+            data = stock.history(start=fecha_inicio, end=fecha_fin_inclusiva)
             
             if data.empty:
                 print(f"⚠️  No hay datos en yfinance para {ticker}")
